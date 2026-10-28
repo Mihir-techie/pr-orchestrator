@@ -88,4 +88,4 @@ This is an LLM-assisted review, not a replacement for CI, deterministic security
 scanners, or human approval.
 
 
-`git commit --amend --reset-author --no-edit` is used to update the author information of your last commit to match your current Git configuration without changing the commit message or opening a text editor
+
