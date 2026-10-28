@@ -89,3 +89,8 @@ scanners, or human approval.
 
 
 `git commit --amend --reset-author --no-edit` is used to update the author information of your last commit to match your current Git configuration without changing the commit message or opening a text editor
+
+git checkout -b <branch-name>
+git add .
+git commit -m "Your descriptive commit message"
+git push origin <branch-name>
