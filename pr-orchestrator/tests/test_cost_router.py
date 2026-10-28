@@ -24,7 +24,8 @@ class CostRouterTests(unittest.TestCase):
         analysis = analyze_diff(diff, self.settings)
         self.assertTrue(analysis.sensitive)
         self.assertEqual(select_model_tier(analysis), "gemini_pro")
-        self.assertEqual(self.settings.gemini_pro_model, self.settings.gemini_flash_model)
+        self.assertEqual(self.settings.gemini_pro_model, "gemini-3.8-flash")
+        self.assertEqual(self.settings.gemini_flash_model, "gemini-1.5-flash")
 
     def test_pruning_removes_blank_and_comment_changes(self) -> None:
         diff = (

@@ -10,9 +10,10 @@ class Settings(BaseSettings):
     github_webhook_secret: SecretStr = SecretStr("")
     groq_api_key: SecretStr = SecretStr("")
     google_api_key: SecretStr = SecretStr("")
-    groq_model: str = "llama-3.1-8b-instant"
-    gemini_flash_model: str = "gemini-2.5-flash"
-    gemini_pro_model: str = "gemini-2.5-flash"
+    groq_model: str = "openai/gpt-oss-20b"
+    groq_flagship_model: str = "openai/gpt-oss-120b"
+    gemini_flash_model: str = "gemini-1.5-flash"
+    gemini_pro_model: str = "gemini-3.8-flash"
     max_diff_chars: int = Field(default=40_000, gt=0, le=200_000)
     log_level: str = "INFO"
     github_api_url: str = "https://api.github.com"

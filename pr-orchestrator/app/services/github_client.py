@@ -1,10 +1,15 @@
+import asyncio
 import base64
+import logging
 from typing import Any
 from urllib.parse import quote
 
 import httpx
 
 from app.config import get_settings
+from app.services.telemetry_store import record_completed_review
+
+logger = logging.getLogger(__name__)
 
 
 class GitHubClient:
@@ -36,6 +41,22 @@ class GitHubClient:
         )
         response.raise_for_status()
         return response.text
+
+    async def get_pull_request_metadata(
+        self, repository: str, number: int
+    ) -> dict[str, Any]:
+        response = await self.client.get(
+            f"{self._repo_path(repository)}/pulls/{number}"
+        )
+        response.raise_for_status()
+        metadata = response.json()
+        if (
+            not isinstance(metadata, dict)
+            or not isinstance(metadata.get("base"), dict)
+            or not isinstance(metadata["base"].get("ref"), str)
+        ):
+            raise RuntimeError("GitHub returned incomplete pull request metadata")
+        return metadata
 
     async def get_pull_files(self, repository: str, number: int) -> list[dict[str, Any]]:
         response = await self.client.get(
@@ -85,6 +106,16 @@ class GitHubClient:
             json={"body": body},
         )
         response.raise_for_status()
+        try:
+            await asyncio.to_thread(
+                record_completed_review, repository, number, body
+            )
+        except Exception:
+            logger.exception(
+                "Unable to persist review telemetry for %s#%s",
+                repository,
+                number,
+            )
 
     async def request_reviewers(
         self, repository: str, number: int, reviewers: list[str]

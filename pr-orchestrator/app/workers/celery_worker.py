@@ -1,6 +1,7 @@
 import asyncio
 import time
-from typing import Any
+from collections.abc import Coroutine
+from typing import Any, TypeVar
 
 from celery import Celery
 from celery.utils.log import get_task_logger
@@ -8,7 +9,10 @@ from celery.utils.log import get_task_logger
 from app.config import get_settings
 from app.services.cost_router import analyze_diff, select_model_tier
 from app.services.github_client import GitHubClient
+from app.services.llm import PermanentLLMError
 from app.agents.graph import review_graph
+
+Result = TypeVar("Result")
 
 settings = get_settings()
 logger = get_task_logger(__name__)
@@ -46,6 +50,7 @@ def _render_report(state: dict[str, Any]) -> str:
         f"{state.get('security_review', 'No security review result.')}\n\n"
         "### Routing and telemetry\n"
         f"- Model route: `{state.get('model_tier', 'unknown')}`\n"
+        f"- Model(s): {', '.join(sorted({str(item['model_name']) for item in metrics if item.get('model_name')})) or 'unknown'}\n"
         f"- Tokens: {total_tokens}\n"
         f"- Estimated LLM cost: ${total_cost:.6f}\n"
         f"- Estimated savings vs. Gemini Pro: ${total_savings:.6f}\n"
@@ -57,6 +62,41 @@ def _render_report(state: dict[str, Any]) -> str:
     if reviewers:
         report += f"- Suggested reviewers: {', '.join('@' + name for name in reviewers)}\n"
     return report
+
+
+def _drain_pending_tasks(loop: asyncio.AbstractEventLoop) -> None:
+    for _ in range(3):
+        pending_tasks = asyncio.all_tasks(loop)
+        if not pending_tasks:
+            return
+        for task in pending_tasks:
+            task.cancel()
+        loop.run_until_complete(
+            asyncio.gather(*pending_tasks, return_exceptions=True)
+        )
+
+    pending_names = ", ".join(task.get_name() for task in asyncio.all_tasks(loop))
+    if pending_names:
+        logger.error("Async tasks remained during event-loop shutdown: %s", pending_names)
+
+
+def _run_with_fresh_loop(
+    coroutine: Coroutine[Any, Any, Result],
+) -> Result:
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coroutine)
+    finally:
+        try:
+            _drain_pending_tasks(loop)
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            _drain_pending_tasks(loop)
+            loop.run_until_complete(loop.shutdown_default_executor())
+            _drain_pending_tasks(loop)
+        finally:
+            asyncio.set_event_loop(None)
+            loop.close()
 
 
 async def _process_pull_request(payload: dict[str, Any]) -> dict[str, Any]:
@@ -93,10 +133,11 @@ async def _process_pull_request(payload: dict[str, Any]) -> dict[str, Any]:
         )
         await github.post_pr_comment(repository, number, _render_report(result))
         logger.info(
-            "Completed review for %s#%s route=%s changed_files=%s tokens=%s cost_usd=%.6f savings_usd=%.6f latency_seconds=%.2f",
+            "Completed review for %s#%s route=%s models=%s changed_files=%s tokens=%s cost_usd=%.6f savings_usd=%.6f latency_seconds=%.2f",
             repository,
             number,
             tier,
+            sorted({str(item["model_name"]) for item in result.get("telemetry", []) if item.get("model_name")}),
             len(analysis.changed_files),
             sum(
                 int(item.get("input_tokens", 0)) + int(item.get("output_tokens", 0))
@@ -122,6 +163,7 @@ async def _process_pull_request(payload: dict[str, Any]) -> dict[str, Any]:
     bind=True,
     name="app.workers.celery_worker.process_pull_request",
     autoretry_for=(Exception,),
+    dont_autoretry_for=(PermanentLLMError,),
     retry_backoff=True,
     retry_backoff_max=600,
     retry_jitter=True,
@@ -133,4 +175,4 @@ def process_pull_request(self: Any, payload: dict[str, Any]) -> dict[str, Any]:
         self.request.id,
         payload.get("repository", {}).get("full_name", "unknown"),
     )
-    return asyncio.run(_process_pull_request(payload))
+    return _run_with_fresh_loop(_process_pull_request(payload))

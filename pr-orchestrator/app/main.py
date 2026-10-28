@@ -4,6 +4,7 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 
+from app.api.dashboard import router as dashboard_router
 from app.api.webhooks import router as webhook_router
 from app.config import get_settings
 from app.services.redis_client import get_redis
@@ -24,6 +25,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(webhook_router, prefix="/api/v1")
+app.include_router(dashboard_router, prefix="/api/v1")
 
 
 @app.get("/health")

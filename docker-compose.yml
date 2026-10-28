@@ -5,6 +5,8 @@ services:
     env_file: .env
     ports:
       - "8000:8000"
+    volumes:
+      - telemetry_data:/app/data
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
@@ -16,4 +18,9 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    volumes:
+      - telemetry_data:/app/data
     command: ["celery", "-A", "app.workers.celery_worker.celery_app", "worker", "--loglevel=INFO", "--concurrency=4"]
+
+volumes:
+  telemetry_data:
