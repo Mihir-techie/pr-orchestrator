@@ -88,4 +88,18 @@ This is an LLM-assisted review, not a replacement for CI, deterministic security
 scanners, or human approval.
 
 
+<!-- `git commit --amend --reset-author --no-edit` is used to update the author information of your last commit to match your current Git configuration without changing the commit message or opening a text editor
+
+git checkout -b <branch-name>
+git add .
+git commit -m "Your descriptive commit message"
+git push origin <branch-name> -->
+
+## ⚡ Token Optimization & Rate-Limit Architecture
+
+Managing LLM API constraints—such as Groq's Tokens Per Minute (TPM) limits and provider rate-limiting (HTTP 429)—is critical for production-grade agentic systems. **MergeFlow** implements a multi-layered resilience strategy:
+
+* **Dynamic Path-Based Routing:** Automatically classifies pull request complexity. Routine file modifications route to cost-effective lightweight models (Groq Llama-3), while security-sensitive paths (`auth/`, `crypto/`, `payments/`) escalate to flagship models.
+* **Token Budgeting & Diff Truncation:** Prevents payload overflow by intelligently analyzing diff sizes, keeping prompt token consumption well beneath strict provider TPM caps.
+* **Resilient Exponential Backoff:** Integrates automated retry handlers and backoff logic within Celery background workers to gracefully manage transient `429 Too Many Requests` responses without crashing the task pipeline.
 `git commit --amend --reset-author --no-edit` is used to update the author information of your last commit to match your current Git configuration without changing the commit message or opening a text editor
