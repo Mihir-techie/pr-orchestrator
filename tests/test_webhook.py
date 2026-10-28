@@ -100,6 +100,7 @@ class GitHubWebhookTests(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         self.assertEqual(response.json()["status"], "duplicate")
         enqueue.assert_not_called()
+        "This is use for testing the github webhook endpoint"
 
 
 if __name__ == "__main__":
