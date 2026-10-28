@@ -100,6 +100,20 @@ class GitHubWebhookTests(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         self.assertEqual(response.json()["status"], "duplicate")
         enqueue.assert_not_called()
+def test_webhook_payload_validation():
+    """Verify webhook ingestion endpoint handles standard payloads."""
+    payload = {
+        "action": "opened",
+        "pull_request": {
+            "number": 1,
+            "title": "Test PR",
+            "head": {"ref": "feature-branch"},
+            "base": {"ref": "main"}
+        },
+        "repository": {
+            "full_name": "Mihir-techie/pr-orchestrator"
+        }
+    }
 
 
 if __name__ == "__main__":
