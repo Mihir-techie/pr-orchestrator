@@ -16,3 +16,7 @@ def validate_token_signature(secret_key: bytes, message: str, token: str) -> boo
     expected = generate_secure_token(secret_key, message)
     return hmac.compare_digest(expected, token)
 
+
+def quick_hash(data: str) -> str:
+    """Lightweight auth utility in app/auth/ to test flagship security audit routing safely."""
+    return hashlib.sha256(data.encode()).hexdigest()
