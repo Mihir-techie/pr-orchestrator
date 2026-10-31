@@ -19,10 +19,17 @@ GROQ_FLAGSHIP_MODEL=openai/gpt-oss-120b
 ```
 
 `REDIS_URL` is used for the Celery broker, Celery result backend, webhook
-deduplication, Redis helpers, and both Compose containers. Compose does not
-start a local Redis service. Do not commit `.env`; `.env.example` contains safe
-placeholders. Rotate any credential shared outside your secret manager before
-configuring it.
+deduplication, request and LLM rate limiting, Redis helpers, and both Compose
+containers. Compose does not start a local Redis service. Do not commit `.env`;
+`.env.example` contains safe placeholders. Rotate any credential shared
+outside your secret manager before configuring it.
+
+The API applies a Redis-backed sliding-window limit to `/api/` endpoints
+(default: 10 requests per client IP per 60 seconds). Rejected requests receive
+HTTP 429 and a `Retry-After` header. IP identity is taken from the direct
+connection, not forwarded headers; configure trusted proxy handling at the
+deployment boundary when running behind a reverse proxy. API requests receive
+HTTP 503 if Redis is unavailable, rather than bypassing the limit.
 
 Create a GitHub webhook targeting
 `https://<your-host>/api/v1/webhooks/github`, choose JSON payloads, configure the
@@ -64,6 +71,12 @@ configuration, recreate both services so they load the current `.env` values:
 `docker compose up -d --build --force-recreate worker web`. Do not purge Redis
 to apply key changes; the worker uses bounded Celery retries, and purging can
 discard queued webhook and manual-review jobs.
+
+LLM calls use a shared Redis token bucket with a 60-second refill window
+(`LLM_TOKENS_PER_MINUTE`, default 30,000). Calls wait asynchronously when the
+estimated prompt-token budget is exhausted. Diffs are capped at 10,000
+characters (`MAX_DIFF_CHARS`) before prompt construction, with sensitive-path
+sections prioritized when truncation is required.
 
 The dashboard's `POST /api/v1/reviews` endpoint queues manual requests through
 the same worker task as GitHub webhooks. Provider SDK retries are disabled so

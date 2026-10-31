@@ -42,6 +42,28 @@ class CostRouterTests(unittest.TestCase):
         self.assertEqual(analysis.changed_lines, 1)
         self.assertEqual(analysis.pruned_diff, "File: src/example.py\n+return value")
 
+    def test_truncation_prioritizes_sensitive_files_within_hard_limit(self) -> None:
+        settings = self.settings.model_copy(update={"max_diff_chars": 100})
+        diff = (
+            "diff --git a/docs/large.txt b/docs/large.txt\n"
+            "--- a/docs/large.txt\n"
+            "+++ b/docs/large.txt\n"
+            "@@ -0,0 +1 @@\n"
+            f"+{'x' * 300}\n"
+            "diff --git a/src/auth.py b/src/auth.py\n"
+            "--- a/src/auth.py\n"
+            "+++ b/src/auth.py\n"
+            "@@ -0,0 +1 @@\n"
+            "+validate_credentials()\n"
+        )
+
+        analysis = analyze_diff(diff, settings)
+
+        self.assertTrue(analysis.truncated)
+        self.assertLessEqual(len(analysis.pruned_diff), 100)
+        self.assertIn("File: src/auth.py", analysis.pruned_diff)
+        self.assertIn("[diff truncated]", analysis.pruned_diff)
+
     def test_codeowners_supports_users_and_teams(self) -> None:
         owners = parse_codeowners(
             "*.py @alice @platform/reviewers\n",

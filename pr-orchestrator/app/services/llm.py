@@ -7,6 +7,7 @@ from langchain_groq import ChatGroq
 
 from app.config import Settings, get_settings
 from app.services.cost_router import ModelTier, estimate_tokens
+from app.services.rate_limiter import acquire_tokens
 
 
 class PermanentLLMError(RuntimeError):
@@ -76,6 +77,11 @@ async def invoke_agent(
     user_prompt: str,
 ) -> tuple[str, dict[str, int | float | str]]:
     settings = get_settings()
+    await acquire_tokens(
+        "groq",
+        estimate_tokens(f"{system_prompt}\n{user_prompt}"),
+        settings.llm_tokens_per_minute,
+    )
     try:
         http_async_client = httpx.AsyncClient(
             timeout=httpx.Timeout(120.0, connect=10.0)

@@ -3,6 +3,8 @@ from functools import lru_cache
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+MAX_DIFF_CHARS = 10_000
+
 
 class Settings(BaseSettings):
     redis_url: SecretStr
@@ -14,7 +16,10 @@ class Settings(BaseSettings):
     groq_flagship_model: str = "openai/gpt-oss-120b"
     gemini_flash_model: str = "gemini-1.5-flash"
     gemini_pro_model: str = "gemini-3.8-flash"
-    max_diff_chars: int = Field(default=40_000, gt=0, le=200_000)
+    max_diff_chars: int = Field(default=MAX_DIFF_CHARS, gt=0, le=MAX_DIFF_CHARS)
+    llm_tokens_per_minute: int = Field(default=30_000, gt=0)
+    ip_rate_limit_requests: int = Field(default=10, gt=0)
+    ip_rate_limit_window_seconds: int = Field(default=60, gt=0)
     log_level: str = "INFO"
     github_api_url: str = "https://api.github.com"
     github_api_version: str = "2022-11-28"

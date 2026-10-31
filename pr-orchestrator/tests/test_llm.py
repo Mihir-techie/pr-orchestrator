@@ -1,7 +1,7 @@
 import asyncio
 import os
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from types import SimpleNamespace
 
 import httpx
@@ -50,6 +50,12 @@ class LoopBoundModel:
 
 class LLMTests(unittest.TestCase):
     def setUp(self) -> None:
+        rate_limiter_patch = patch(
+            "app.services.llm.acquire_tokens",
+            new_callable=AsyncMock,
+        )
+        self.rate_limiter = rate_limiter_patch.start()
+        self.addCleanup(rate_limiter_patch.stop)
         self.settings = Settings(
             _env_file=None,
             redis_url="redis://localhost:6379/0",
@@ -225,6 +231,7 @@ class LLMTests(unittest.TestCase):
         self.assertEqual(metrics["model_name"], "openai/gpt-oss-20b")
         self.assertEqual(metrics["input_tokens"], 5)
         self.assertEqual(metrics["output_tokens"], 3)
+        self.rate_limiter.assert_awaited_once_with("groq", 2, 30_000)
 
     def test_groq_model_is_created_for_each_invocation(self) -> None:
         async def invoke_twice() -> None:

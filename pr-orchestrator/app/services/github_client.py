@@ -124,8 +124,28 @@ class GitHubClient:
             return
         users = [reviewer for reviewer in reviewers if "/" not in reviewer]
         teams = [reviewer for reviewer in reviewers if "/" in reviewer]
-        response = await self.client.post(
-            f"{self._repo_path(repository)}/pulls/{number}/requested_reviewers",
-            json={"reviewers": users, "team_reviewers": teams},
-        )
-        response.raise_for_status()
+        try:
+            response = await self.client.post(
+                f"{self._repo_path(repository)}/pulls/{number}/requested_reviewers",
+                json={"reviewers": users, "team_reviewers": teams},
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 422:
+                logger.warning(
+                    "GitHub rejected reviewer assignment for %s#%s",
+                    repository,
+                    number,
+                )
+            else:
+                logger.exception(
+                    "Unable to request reviewers for %s#%s",
+                    repository,
+                    number,
+                )
+        except Exception:
+            logger.exception(
+                "Unable to request reviewers for %s#%s",
+                repository,
+                number,
+            )
