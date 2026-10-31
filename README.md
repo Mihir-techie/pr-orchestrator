@@ -120,3 +120,11 @@ Then recreate the services to load the updated .env and code:
 
 docker compose up -d --build --force-recreate worker web
 docker compose logs -f worker
+
+
+
+How Direct Merge PR work 
+git checkout main 
+git pull origin main 
+git merge (your current branch name)
+git push origin main 
